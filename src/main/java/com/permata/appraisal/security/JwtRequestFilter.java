@@ -25,13 +25,15 @@ import java.util.stream.Collectors;
 public class JwtRequestFilter extends OncePerRequestFilter {
 
     private final JwtTokenUtil jwtTokenUtil;
+    private final JwtBlacklistService jwtBlacklistService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         try {
             String jwt = getJwtFromRequest(request);
-            if (StringUtils.hasText(jwt) && jwtTokenUtil.validateToken(jwt)) {
+            if (StringUtils.hasText(jwt) && jwtTokenUtil.validateToken(jwt)
+                    && !jwtBlacklistService.isRevoked(jwt)) {
                 String userId = jwtTokenUtil.getUserIdFromToken(jwt);
                 List<String> roles = jwtTokenUtil.getRolesFromToken(jwt);
 
