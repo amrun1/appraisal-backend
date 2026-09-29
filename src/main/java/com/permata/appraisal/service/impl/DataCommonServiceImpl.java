@@ -2,6 +2,7 @@ package com.permata.appraisal.service.impl;
 
 import com.permata.appraisal.common.PaginatedListResponse;
 import com.permata.appraisal.common.PagingInfo;
+import com.permata.appraisal.dto.DataCommonDto;
 import com.permata.appraisal.dto.DataCommonTableDto;
 import com.permata.appraisal.service.DataCommonService;
 import jakarta.persistence.EntityManager;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 @Service
 public class DataCommonServiceImpl implements DataCommonService {
@@ -22,17 +24,7 @@ public class DataCommonServiceImpl implements DataCommonService {
 
     @Override
     @Transactional(readOnly = true)
-    @SuppressWarnings("unchecked")
     public PaginatedListResponse<DataCommonTableDto> findForTables(PagingInfo pagingInfo, DataCommonTableDto filter) {
-        List<String> sql = new ArrayList<>();
-        sql.add("select a.id, a.orderNumber, a.name, a.appraisalType.name, a.appraisalTypeCategory, " +
-                "a.dataDetail.alamat, a.dataDetail.province, a.dataDetail.subDistrict, a.dataDetail.district, " +
-                "a.dataDetail.city, a.position, a.typeReport, a.dataDetail.assetType.name, " +
-                "a.dataDetail.assetType.categoryType.name, c.lpaNumber, a.marketingBranch.name, d.name, " +
-                "a.createdBy, p.name ");
-        List<String> from = new ArrayList<>();
-        from.add(" from DataCommon a left join a.dataDetail b left join b.lpaUmum c left join a.branch d " +
-                "join Person p on p.userId = a.createdBy ");
         List<String> where = new ArrayList<>();
 
         if (StringUtils.isNotBlank(filter.getNoOrder())) {
@@ -79,39 +71,80 @@ public class DataCommonServiceImpl implements DataCommonService {
             }
         }
 
-        String hqlQuery;
-        if (where.isEmpty()) {
-            hqlQuery = String.join(" ", sql) + String.join(" ", from);
-        } else {
-            hqlQuery = String.join(" ", sql) + String.join(" ", from) + " where " + String.join(" and ", where);
+        return findPaginated(where, pagingInfo, query -> setParameters(query, filter));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedListResponse<DataCommonTableDto> findForAppSurveyor(PagingInfo pagingInfo, DataCommonDto filter) {
+        List<String> where = new ArrayList<>();
+
+        if (StringUtils.isNotBlank(filter.getPosition())) {
+            where.add("a.position = :posisi");
+        }
+        if (StringUtils.isNotBlank(filter.getTaskList())) {
+            where.add("a.taskList = :taskList");
+        }
+        if (filter.getAppBranchId() != null) {
+            where.add("d.id = :appBranchId");
         }
 
-        String hqlCount = "select count(a.id) " + String.join(" ", from) +
-                (where.isEmpty() ? "" : " where " + String.join(" and ", where));
+        return findPaginated(where, pagingInfo, query -> {
+            if (StringUtils.isNotBlank(filter.getPosition())) {
+                query.setParameter("posisi", filter.getPosition());
+            }
+            if (StringUtils.isNotBlank(filter.getTaskList())) {
+                query.setParameter("taskList", filter.getTaskList());
+            }
+            if (filter.getAppBranchId() != null) {
+                query.setParameter("appBranchId", filter.getAppBranchId());
+            }
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private PaginatedListResponse<DataCommonTableDto> findPaginated(List<String> where, PagingInfo pagingInfo,
+                                                                    Consumer<Query> parameterBinder) {
+
+        String SELECT_LIST = """
+            select a.id, a.orderNumber, a.name, a.appraisalType.name, a.appraisalTypeCategory,
+            a.dataDetail.alamat, a.dataDetail.province, a.dataDetail.subDistrict, a.dataDetail.district,
+            a.dataDetail.city, a.position, a.typeReport, a.dataDetail.assetType.name,
+            a.dataDetail.assetType.categoryType.name, c.lpaNumber, a.marketingBranch.name, d.name,
+            a.createdBy, p.name
+            """;
+
+        String FROM_LIST = """
+            from DataCommon a left join a.dataDetail b left join b.lpaUmum c left join a.branch d
+            join Person p on p.userId = a.createdBy
+            """;
+
+        String whereClause = where.isEmpty() ? "" : " where " + String.join(" and ", where);
+        String hqlQuery = SELECT_LIST + FROM_LIST + whereClause;
+        String hqlCount = "select count(a.id) " + FROM_LIST + whereClause;
 
         Query countQuery = entityManager.createQuery(hqlCount);
-        setParameters(countQuery, filter);
+        parameterBinder.accept(countQuery);
         Number total = (Number) countQuery.getSingleResult();
 
         Query dataQuery = entityManager.createQuery(hqlQuery);
-        setParameters(dataQuery, filter);
+        parameterBinder.accept(dataQuery);
 
         int currentPage = pagingInfo != null && pagingInfo.getCurrentPage() != null ?
                 pagingInfo.getCurrentPage() - 1 : 0;
         int pageSize = pagingInfo != null && pagingInfo.getPageSize() != null ?
                 pagingInfo.getPageSize() : 10;
 
-        List<DataCommonTableDto> resultSet = new ArrayList<>();
+        List<Object[]> rows;
         if (pagingInfo != null && pagingInfo.isRetrieveAll()) {
-            resultSet.addAll(mapData((List<Object[]>) dataQuery.getResultList()));
+            rows = (List<Object[]>) dataQuery.getResultList();
         } else {
-            List<Object[]> page = dataQuery.setFirstResult(currentPage * pageSize)
+            rows = dataQuery.setFirstResult(currentPage * pageSize)
                     .setMaxResults(pageSize).getResultList();
-            resultSet.addAll(mapData(page));
         }
 
         PaginatedListResponse<DataCommonTableDto> response = new PaginatedListResponse<>();
-        response.setDataList(resultSet);
+        response.setDataList(new ArrayList<>(mapData(rows)));
         response.setTotalRowCount(total == null ? 0 : total.intValue());
         if (pagingInfo != null) {
             int pages = pageSize > 0 ? (int) Math.ceil((total == null ? 0 : total.intValue()) / (double) pageSize) : 0;
@@ -121,7 +154,7 @@ public class DataCommonServiceImpl implements DataCommonService {
         return response;
     }
 
-    private void setParameters(jakarta.persistence.Query query, DataCommonTableDto filter) {
+    private void setParameters(Query query, DataCommonTableDto filter) {
         if (StringUtils.isNotBlank(filter.getNoOrder())) {
             query.setParameter("noOrder", "%" + filter.getNoOrder().toLowerCase() + "%");
         }

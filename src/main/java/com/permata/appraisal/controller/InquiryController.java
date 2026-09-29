@@ -5,7 +5,9 @@ import com.permata.appraisal.common.ApiTemplateMessage;
 import com.permata.appraisal.common.PaginatedListRequest;
 import com.permata.appraisal.common.PaginatedListResponse;
 import com.permata.appraisal.dto.DataCommonTableDto;
+import com.permata.appraisal.dto.PersonLoginDto;
 import com.permata.appraisal.service.DataCommonService;
+import com.permata.appraisal.service.PersonLoginService;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
@@ -23,10 +25,12 @@ public class InquiryController {
 
     private final ApiTemplateMessage templateMessage;
     private final DataCommonService dataCommonService;
+    private final PersonLoginService personLoginService;
 
     @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "OK")})
-    @PostMapping(value = "/findByCriteriaPaginated", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Object> findByCriteriaPaginated(@RequestBody PaginatedListRequest<DataCommonTableDto> request) {
+    @PostMapping(value = "/find", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Object> find(@RequestBody PaginatedListRequest<DataCommonTableDto> request) {
+        PersonLoginDto person = personLoginService.getCurrentLogin();
         request.getWrapper().setSourceId("null_inquiry");
         PaginatedListResponse<DataCommonTableDto> data = dataCommonService.findForTables(request.getPagingInfo(), request.getWrapper());
         return templateMessage.buildResponseEntity(new ApiResponseTemplate(
