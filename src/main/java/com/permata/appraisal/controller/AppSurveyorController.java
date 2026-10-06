@@ -35,12 +35,11 @@ public class AppSurveyorController {
 
     @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "OK")})
     @PostMapping(value = "/find", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Object> find(@RequestBody PaginatedListRequest<DataCommonDto> request,
-                                       @RequestParam(value = "task", required = false) String task) {
+    public ResponseEntity<Object> find(@RequestBody PaginatedListRequest<DataCommonDto> request) {
         PersonLoginDto person = personLoginService.getCurrentLogin();
         DataCommonDto dto = request.getWrapper() != null ? request.getWrapper() : new DataCommonDto();
         dto.setPosition(POSISI);
-        dto.setTaskList(StringUtils.isEmpty(task) ? person.getUserId() : task);
+        dto.setTaskList(person.getUserId());
         dto.setAppBranchId(personLoginService.getCurrentRole(ROLE_SURVEYOR).getAppBranchId());
 
         PaginatedListResponse<DataCommonTableDto> data =
