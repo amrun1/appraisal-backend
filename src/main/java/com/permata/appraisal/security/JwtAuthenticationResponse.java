@@ -1,6 +1,7 @@
 package com.permata.appraisal.security;
 
 import java.util.List;
+import com.permata.appraisal.dto.MenuDto;
 
 public class JwtAuthenticationResponse {
 
@@ -8,11 +9,14 @@ public class JwtAuthenticationResponse {
     private String tokenType = "Bearer";
     private String userId;
     private List<String> roles;
+    private List<MenuDto.Response> menus;
 
-    public JwtAuthenticationResponse(String token, String userId, List<String> roles) {
+    public JwtAuthenticationResponse(String token, String userId, List<String> roles,
+            List<MenuDto.Response> menus) {
         this.token = token;
         this.userId = userId;
         this.roles = roles;
+        this.menus = menus;
     }
 
     public String getToken() {
@@ -45,5 +49,13 @@ public class JwtAuthenticationResponse {
 
     public void setRoles(List<String> roles) {
         this.roles = roles;
+    }
+
+    public List<MenuDto.Response> getMenus() {
+        return menus;
+    }
+
+    public void setMenus(List<MenuDto.Response> menus) {
+        this.menus = menus;
     }
 }
